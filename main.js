@@ -10,6 +10,7 @@ function createWindow() {
     height: 886,            // ~ matches the device 1680:1240 aspect ratio
     minWidth: 640,
     minHeight: 472,
+    icon: path.join(__dirname, 'icon.ico'),   // taskbar / window icon
     frame: false,           // no OS title bar — the device IS the window
     transparent: true,      // see-through corners, only the device shows
     backgroundColor: '#00000000',

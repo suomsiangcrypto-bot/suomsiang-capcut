@@ -15,12 +15,14 @@
     "files": [
       "main.js",
       "index.html",
-      "favicon.ico"
+      "favicon.ico",
+      "icon.ico"
     ],
     "directories": {
       "output": "dist"
     },
     "win": {
+      "icon": "icon.ico",
       "target": [
         { "target": "nsis", "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
