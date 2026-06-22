@@ -59,6 +59,14 @@
   .rh-ne{ top:-6px;  right:-6px; cursor:nesw-resize; }
   .rh-sw{ bottom:-6px; left:-6px;  cursor:nesw-resize; }
   .rh-se{ bottom:-6px; right:-6px; cursor:nwse-resize; }
+  /* fullscreen (double-click the screen): device fills the whole monitor */
+  body.app-fullscreen .device{
+    width:100vw !important; height:100vh !important; max-width:none !important;
+    border-radius:0 !important; box-shadow:none !important; padding:0 !important;
+  }
+  body.app-fullscreen .device::before{ display:none !important; }
+  body.app-fullscreen .screen{ border-radius:0 !important; }
+  body.app-fullscreen .resize-handle{ display:none !important; }
 
   /* ====== OUTER DEVICE ====== */
   .device{
@@ -1604,6 +1612,33 @@ $('#closeBtn').onclick = ()=>{
     });
   });
 })();
+
+/* ---------- Fullscreen (double-click the screen to fill the whole monitor) ---------- */
+function setFullscreen(on){
+  document.body.classList.toggle('app-fullscreen', on);
+  if(_electron && _electron.ipcRenderer){ _electron.ipcRenderer.send('set-fullscreen', on); }
+  else {
+    try{ if(on) document.documentElement.requestFullscreen(); else if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+  }
+  // the canvas size changes with the layout — refit after it settles
+  setTimeout(()=>{ try{ resizeWave(); fitBigText(); }catch(e){} }, 80);
+}
+function toggleFullscreen(){ setFullscreen(!document.body.classList.contains('app-fullscreen')); }
+
+// double-click the video -> fullscreen
+$('#videoStage')?.addEventListener('dblclick', (e)=>{ e.preventDefault(); toggleFullscreen(); });
+// double-click empty areas of the player face -> fullscreen (ignore real controls + the waveform, which has its own zoom)
+$('.screen')?.addEventListener('dblclick', (e)=>{
+  if(e.target.closest('.wave-area, button, input, select, .knob, .knob-wrap, .eq-slider, .mini-btn, .power-btn, .big-btn, .big-ring, .add-song, .pl-icon, .tab, .track, .track-del, .drawer, .drawer-backdrop, .resize-handle, .vid-controls')) return;
+  toggleFullscreen();
+});
+// Esc leaves fullscreen
+window.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape' && document.body.classList.contains('app-fullscreen')) setFullscreen(false);
+});
+// leaving video mode also leaves fullscreen
+const _vExitOld = $('#vExit').onclick;
+$('#vExit').onclick = ()=>{ if(document.body.classList.contains('app-fullscreen')) setFullscreen(false); if(_vExitOld) _vExitOld(); };
 
 /* ---------- Fit big-button text inside the circle ---------- */
 function fitBigText(){

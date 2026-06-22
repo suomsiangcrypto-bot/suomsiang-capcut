@@ -38,6 +38,9 @@ ipcMain.on('win-close', () => { if (win) win.close(); });
 // --- tell the renderer where to store the saved playlist (playlist.json) ---
 ipcMain.on('get-userdata', (e) => { e.returnValue = app.getPath('userData'); });
 
+// --- double-click the screen -> fill the whole monitor ---
+ipcMain.on('set-fullscreen', (_e, on) => { if (win) win.setFullScreen(!!on); });
+
 // --- corner resize handles: drag a corner to scale the player (keeps shape) ---
 let _resizeBounds = null;
 const ASPECT = 1680 / 1240;            // device width : height
