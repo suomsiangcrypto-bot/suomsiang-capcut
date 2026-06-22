@@ -654,6 +654,7 @@
           <button class="vid-btn" id="vNext" title="ถัดไป">⏭</button>
           <span class="vid-time" id="vidTime">0:00 / 0:00</span>
           <span class="vid-vol">🔊<input type="range" id="vidVol" min="0" max="100" value="75"></span>
+          <button class="vid-btn" id="vFull" title="ขยายเต็มจอ (ดับเบิลคลิกที่จอก็ได้)">⛶</button>
           <button class="vid-btn exit" id="vExit" title="ออกจากโหมดวิดีโอ">✕</button>
         </div>
       </div>
@@ -1616,6 +1617,7 @@ $('#closeBtn').onclick = ()=>{
 /* ---------- Fullscreen (double-click the screen to fill the whole monitor) ---------- */
 function setFullscreen(on){
   document.body.classList.toggle('app-fullscreen', on);
+  const fb=$('#vFull'); if(fb){ fb.textContent = on ? '🗗' : '⛶'; fb.title = on ? 'ออกจากเต็มจอ (Esc)' : 'ขยายเต็มจอ (ดับเบิลคลิกที่จอก็ได้)'; }
   if(_electron && _electron.ipcRenderer){ _electron.ipcRenderer.send('set-fullscreen', on); }
   else {
     try{ if(on) document.documentElement.requestFullscreen(); else if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
@@ -1624,6 +1626,7 @@ function setFullscreen(on){
   setTimeout(()=>{ try{ resizeWave(); fitBigText(); }catch(e){} }, 80);
 }
 function toggleFullscreen(){ setFullscreen(!document.body.classList.contains('app-fullscreen')); }
+$('#vFull')?.addEventListener('click', ()=> toggleFullscreen());
 
 // double-click the video -> fullscreen
 $('#videoStage')?.addEventListener('dblclick', (e)=>{ e.preventDefault(); toggleFullscreen(); });
