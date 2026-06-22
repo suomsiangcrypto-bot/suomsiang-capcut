@@ -187,6 +187,7 @@
 
   /* ====== WAVEFORM ====== */
   .wave-area{grid-area:wave; padding:3%; overflow:hidden; position:relative; cursor:pointer;}
+  .wave-area.inset{ background:transparent; box-shadow:none; }
   #wave{width:100%; height:100%; display:block;}
   .wave-seek{position:absolute; left:5%; right:5%; bottom:7px; height:7px; border-radius:4px;
     background:rgba(255,255,255,.16); cursor:pointer; z-index:7;}
@@ -206,7 +207,7 @@
   .wave-zoom-hint{display:none;}
   .device.wave-zoom .wave-area{
     grid-column:1 / -1;          /* span the whole middle row (over yellow + volume) */
-    z-index:45; border-radius:16px; padding:1.4%; cursor:zoom-out; background:#06090d;
+    z-index:45; border-radius:16px; padding:1.4%; cursor:zoom-out; background:transparent;
     box-shadow:inset 0 0 55px var(--edge-glow), 0 0 0 1px rgba(255,255,255,.05);}
   /* hide the big yellow button + volume knob while the waveform is expanded */
   .device.wave-zoom .center-area,
