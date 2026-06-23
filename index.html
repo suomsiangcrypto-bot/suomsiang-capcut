@@ -195,16 +195,19 @@
   .wave-area{grid-area:wave; padding:3%; overflow:hidden; position:relative; cursor:pointer;}
   .wave-area.inset{ background:transparent; box-shadow:none; }
   #wave{width:100%; height:100%; display:block;}
-  .wave-seek{position:absolute; left:5%; right:5%; bottom:7px; height:7px; border-radius:4px;
-    background:rgba(255,255,255,.16); cursor:pointer; z-index:7;}
-  .wave-seek-fill{height:100%; width:0; border-radius:4px; background:var(--cyan-bright);
-    box-shadow:0 0 8px var(--cyan); position:relative;}
-  .wave-seek-fill::after{content:""; position:absolute; right:-5px; top:50%; transform:translateY(-50%);
-    width:11px; height:11px; border-radius:50%; background:#fff; box-shadow:0 0 6px var(--cyan-bright);}
-  .wave-time{position:absolute; right:6%; bottom:18px; z-index:7; color:#cdd6dc;
+  .wave-seek{position:absolute; left:5%; right:5%; bottom:9px; height:11px; border-radius:7px;
+    background:rgba(0,0,0,.5); box-shadow:inset 0 0 0 1px rgba(255,255,255,.22), 0 1px 4px rgba(0,0,0,.55);
+    cursor:pointer; z-index:7;}
+  .wave-seek-fill{height:100%; width:0; border-radius:7px; background:var(--cyan-bright);
+    box-shadow:0 0 12px var(--cyan); position:relative;}
+  .wave-seek-fill::after{content:""; position:absolute; right:-10px; top:50%; transform:translateY(-50%);
+    width:20px; height:20px; border-radius:50%; background:#fff; border:2px solid var(--cyan-bright);
+    box-shadow:0 0 12px var(--cyan-bright), 0 1px 4px rgba(0,0,0,.6);}
+  .wave-time{position:absolute; right:6%; bottom:24px; z-index:7; color:#cdd6dc;
     font-size:clamp(10px,1.2vw,14px); font-variant-numeric:tabular-nums; text-shadow:0 1px 2px #000;}
-  .device.wave-zoom .wave-seek{bottom:12px; height:10px; left:2%; right:2%;}
-  .device.wave-zoom .wave-time{bottom:26px; right:2.5%; font-size:clamp(13px,1.6vw,20px);}
+  .device.wave-zoom .wave-seek{bottom:16px; height:15px; left:2%; right:2%;}
+  .device.wave-zoom .wave-seek-fill::after{width:26px; height:26px; right:-13px;}
+  .device.wave-zoom .wave-time{bottom:36px; right:2.5%; font-size:clamp(13px,1.6vw,20px);}
   .wave-exit{display:none; position:absolute; top:12px; right:14px; z-index:6;
     width:36px; height:30px; border:none; border-radius:7px; cursor:pointer;
     background:rgba(38,44,50,.92); color:#cdd6dc; font-size:15px; align-items:center; justify-content:center;
@@ -531,6 +534,10 @@
     box-shadow:inset 0 1px 1px rgba(255,255,255,.08), 0 2px 4px rgba(0,0,0,.4);}
   .bg-clear:hover:not(:disabled){background:#e53935; color:#fff;}
   .bg-clear:disabled{opacity:.4; cursor:default;}
+  .manage-link{display:block; width:100%; margin-bottom:12px; border:none; border-radius:10px; cursor:pointer;
+    padding:12px 10px; font-size:clamp(12px,1.4vw,15px); font-weight:700; color:#dfe6ea;
+    background:linear-gradient(#2c323a,#1d2228); box-shadow:inset 0 1px 1px rgba(255,255,255,.08), 0 2px 4px rgba(0,0,0,.4); transition:.15s;}
+  .manage-link:hover{background:linear-gradient(#363d46,#23292f); box-shadow:0 0 10px var(--cyan);}
 </style>
 </head>
 <body>
@@ -1416,6 +1423,7 @@ function openDrawer(mode){
         '<button class="bg-pick" id="bgVidPick">🎬 วิดีโอพื้นหลัง</button>'+
         '<button class="bg-clear" id="bgClear" '+(_hasBg?'':'disabled')+'>ลบพื้นหลัง</button>'+
       '</div>'+
+      '<button class="manage-link" id="goManage">☰ จัดเรียง / ลบเพลง (ดูชื่อเต็ม)</button>'+
       '<div class="skin-grid">'+SKINS.map((s,i)=>`
       <div class="skin-cell ${i===skinIndex?'on':''}" data-skin="${i}">
         <span class="skin-dot" style="background:${s.bright};box-shadow:0 0 10px ${s.bright}"></span>
@@ -1424,6 +1432,7 @@ function openDrawer(mode){
     body.querySelectorAll('[data-skin]').forEach(el=> el.onclick=()=>{ setSkin(+el.dataset.skin); openDrawer('skin'); });
     body.querySelector('#bgPick').onclick=()=> $('#bgInput').click();
     body.querySelector('#bgVidPick').onclick=()=> $('#bgVidInput').click();
+    body.querySelector('#goManage').onclick=()=> openDrawer('playlist');
     const _bc=body.querySelector('#bgClear');
     if(_bc) _bc.onclick=()=>{ if(bgImage||bgVideoUrl){ clearBgImage(); openDrawer('skin'); } };
     $('#drawer').classList.add('open'); $('#drawerBackdrop').classList.add('show');
@@ -1439,7 +1448,7 @@ function openDrawer(mode){
       <div class="dr-item" draggable="true" data-i="${i}">
         <span class="dr-grip">⋮⋮</span>
         <span class="dr-num">${i+1}</span>
-        <span class="dr-name">${t.isVideo?'🎬 ':''}${escapeHtml(t.name)}</span>
+        <span class="dr-name full">${t.isVideo?'🎬 ':''}${escapeHtml(t.name)}</span>
         <span class="dr-time">${t.time}</span>
         <span class="dr-move"><button data-up="${i}" title="เลื่อนขึ้น">▲</button><button data-down="${i}" title="เลื่อนลง">▼</button></span>
         <button class="dr-del" data-del="${i}" title="ลบเพลงนี้">✕</button>
