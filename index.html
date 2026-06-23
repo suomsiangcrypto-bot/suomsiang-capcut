@@ -103,7 +103,13 @@
       "wave  center  knob"
       "plist controls plist2";
     gap:1.1%; padding:1.6%;
+    isolation:isolate;          /* keep the bg video layered correctly behind panels */
   }
+  /* optional background video (and a dark veil for readability), behind all panels */
+  .screen-bg-video{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+    z-index:-1; pointer-events:none; display:none; }
+  .screen-bg-veil{ position:absolute; inset:0; z-index:-1; pointer-events:none; display:none;
+    background:linear-gradient(rgba(8,11,15,.40),rgba(8,11,15,.52)); }
 
   /* ====== GENERIC RAISED PANEL ====== */
   .raised{
@@ -515,9 +521,9 @@
   .skin-nm{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 
   /* ====== BACKGROUND CONTROLS (in skin drawer) ====== */
-  .bg-controls{display:flex; gap:9px; margin-bottom:12px;}
-  .bg-controls button{flex:1; border:none; border-radius:10px; cursor:pointer; padding:11px 10px;
-    font-size:clamp(12px,1.4vw,15px); font-weight:700; transition:.15s;}
+  .bg-controls{display:flex; flex-wrap:wrap; gap:9px; margin-bottom:12px;}
+  .bg-controls button{flex:1 1 30%; min-width:96px; border:none; border-radius:10px; cursor:pointer; padding:11px 8px;
+    font-size:clamp(11px,1.3vw,14px); font-weight:700; transition:.15s; white-space:nowrap;}
   .bg-pick{background:linear-gradient(#2c4a52,#1b3a42); color:var(--cyan-bright);
     box-shadow:inset 0 1px 1px rgba(255,255,255,.1), 0 2px 4px rgba(0,0,0,.4);}
   .bg-pick:hover{background:linear-gradient(#356069,#214a54); box-shadow:0 0 10px var(--cyan);}
@@ -535,6 +541,10 @@
     <button class="winbtn close" id="closeBtn" title="ปิดโปรแกรม">&#10005;</button>
   </div>
   <div class="screen">
+
+    <!-- BACKGROUND VIDEO (optional, sits behind everything) -->
+    <video class="screen-bg-video" id="bgVideo" muted loop playsinline></video>
+    <div class="screen-bg-veil" id="bgVeil"></div>
 
     <!-- LOGO -->
     <div class="logo-area">
@@ -639,7 +649,7 @@
     <!-- PLAYLIST RIGHT -->
     <div class="plist2-area">
       <div class="plist-inner raised">
-        <div class="plist-title">Playlist <span class="plist-icons"><span class="add-song" id="addBtn" title="เพิ่มเพลงจากเครื่อง">＋</span><span class="add-song" id="bgBtn" title="เพิ่มรูปพื้นหลังในจอเครื่องเล่น">🖼</span><span class="pl-icon" id="reorderBtn" title="เลือกสกิน (สีเครื่อง)">🎨</span><span class="pl-icon" id="manageBtn" title="จัดเรียง / ลบเพลง">☰</span></span></div>
+        <div class="plist-title">Playlist <span class="plist-icons"><span class="add-song" id="addBtn" title="เพิ่มเพลงจากเครื่อง">＋</span><span class="add-song" id="bgBtn" title="เพิ่มรูปพื้นหลังในจอเครื่องเล่น">🖼</span><span class="add-song" id="bgVidBtn" title="เพิ่มวิดีโอพื้นหลังในจอเครื่องเล่น">🎬</span><span class="pl-icon" id="reorderBtn" title="เลือกสกิน (สีเครื่อง)">🎨</span><span class="pl-icon" id="manageBtn" title="จัดเรียง / ลบเพลง">☰</span></span></div>
         <div class="track-list" id="listB"></div>
       </div>
     </div>
@@ -681,6 +691,7 @@
 
 <input type="file" id="fileInput" accept="audio/*,video/*" multiple>
 <input type="file" id="bgInput" accept="image/*">
+<input type="file" id="bgVidInput" accept="video/*">
 
 <script>
 /* ============================================================
@@ -705,9 +716,11 @@ let uploads = []; // {name, time, url, isVideo}
 let eqValues = { bass:0.5, mid:0.5, treble:0.5 };
 /* custom background image (data URL) shown behind the device, replacing the skin gradient */
 let bgImage = null;
+/* custom background VIDEO (plays muted+looped behind the controls). url for playback, path to remember it. */
+let bgVideoUrl = null, bgVideoPath = null;
 
 /* ---------- Persistence (localStorage) ---------- */
-const LS_KEY='suomsiang.settings', LS_BG='suomsiang.bg';
+const LS_KEY='suomsiang.settings', LS_BG='suomsiang.bg', LS_BGVID='suomsiang.bgvideo';
 let _loaded=null;
 function saveSettings(){
   try{
@@ -721,6 +734,12 @@ function saveBg(){
     if(bgImage) localStorage.setItem(LS_BG, bgImage);
     else localStorage.removeItem(LS_BG);
   }catch(e){ /* image too big for quota — keep it for this session only */ }
+}
+function saveBgVideo(){
+  try{
+    if(bgVideoPath) localStorage.setItem(LS_BGVID, bgVideoPath);   // remember the file path
+    else localStorage.removeItem(LS_BGVID);
+  }catch(e){}
 }
 function loadSettings(){
   try{ _loaded = JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ _loaded=null; }
@@ -1046,12 +1065,25 @@ function skinScreenGradient(){
 }
 function applyScreenBackground(){
   const scr=document.querySelector('.screen'); if(!scr) return;
-  if(bgImage){
-    // image fills the player's screen; a soft dark veil keeps the glowing UI + labels readable
-    scr.style.background =
-      `linear-gradient(rgba(8,11,15,.40),rgba(8,11,15,.52)), url("${bgImage}") center center / cover no-repeat`;
-  } else {
+  const vid=document.getElementById('bgVideo'), veil=document.getElementById('bgVeil');
+  if(bgVideoUrl){
+    // a background video is active — show it (muted, looping) behind everything
+    if(vid){
+      if(vid.getAttribute('src')!==bgVideoUrl){ vid.src=bgVideoUrl; }
+      vid.style.display='block'; vid.muted=true; vid.loop=true;
+      vid.play().catch(()=>{});
+    }
+    if(veil) veil.style.display='block';
     scr.style.background = skinScreenGradient();
+  } else {
+    if(vid){ try{ vid.pause(); vid.removeAttribute('src'); vid.load(); }catch(e){} vid.style.display='none'; }
+    if(veil) veil.style.display='none';
+    if(bgImage){
+      scr.style.background =
+        `linear-gradient(rgba(8,11,15,.40),rgba(8,11,15,.52)), url("${bgImage}") center center / cover no-repeat`;
+    } else {
+      scr.style.background = skinScreenGradient();
+    }
   }
 }
 function applyBodyBackground(){
@@ -1062,13 +1094,20 @@ function applyBodyBackground(){
 }
 function setBgImage(dataUrl){
   bgImage = dataUrl;
+  bgVideoUrl = null; bgVideoPath = null;     // image replaces any video
   applyScreenBackground();
-  saveBg();
+  saveBg(); saveBgVideo();
 }
-function clearBgImage(){
-  bgImage = null;
+function setBgVideo(url, path){
+  bgVideoUrl = url; bgVideoPath = path || null;
+  bgImage = null;                            // video replaces any image
   applyScreenBackground();
-  saveBg();
+  saveBg(); saveBgVideo();
+}
+function clearBgImage(){    // clears whatever background is set (image OR video)
+  bgImage = null; bgVideoUrl = null; bgVideoPath = null;
+  applyScreenBackground();
+  saveBg(); saveBgVideo();
 }
 /* downscale a chosen image so it fits comfortably in localStorage, then apply */
 function loadBgFromFile(file){
@@ -1090,6 +1129,12 @@ function loadBgFromFile(file){
     img.src = reader.result;
   };
   reader.readAsDataURL(file);
+}
+function loadBgVideoFromFile(file){
+  if(!file) return;
+  const p = getFilePath(file);               // real disk path in the desktop app (remembered)
+  if(p) setBgVideo(pathToURL(p), p);
+  else  setBgVideo(URL.createObjectURL(file), null);   // browser: this session only
 }
 
 /* ---------- EQ sliders ---------- */
@@ -1364,10 +1409,12 @@ function openDrawer(mode){
   const body=$('#drawerBody'), title=$('#drawerTitle');
   if(mode==='skin'){
     title.textContent='เลือกสกิน (สีของเครื่อง)';
+    const _hasBg = !!(bgImage || bgVideoUrl);
     body.innerHTML=
       '<div class="bg-controls">'+
-        '<button class="bg-pick" id="bgPick">🖼 เลือกรูปพื้นหลังจอเครื่อง</button>'+
-        '<button class="bg-clear" id="bgClear" '+(bgImage?'':'disabled')+'>ลบรูปพื้นหลัง</button>'+
+        '<button class="bg-pick" id="bgPick">🖼 รูปพื้นหลัง</button>'+
+        '<button class="bg-pick" id="bgVidPick">🎬 วิดีโอพื้นหลัง</button>'+
+        '<button class="bg-clear" id="bgClear" '+(_hasBg?'':'disabled')+'>ลบพื้นหลัง</button>'+
       '</div>'+
       '<div class="skin-grid">'+SKINS.map((s,i)=>`
       <div class="skin-cell ${i===skinIndex?'on':''}" data-skin="${i}">
@@ -1376,8 +1423,9 @@ function openDrawer(mode){
       </div>`).join('')+'</div>';
     body.querySelectorAll('[data-skin]').forEach(el=> el.onclick=()=>{ setSkin(+el.dataset.skin); openDrawer('skin'); });
     body.querySelector('#bgPick').onclick=()=> $('#bgInput').click();
+    body.querySelector('#bgVidPick').onclick=()=> $('#bgVidInput').click();
     const _bc=body.querySelector('#bgClear');
-    if(_bc) _bc.onclick=()=>{ if(bgImage){ clearBgImage(); openDrawer('skin'); } };
+    if(_bc) _bc.onclick=()=>{ if(bgImage||bgVideoUrl){ clearBgImage(); openDrawer('skin'); } };
     $('#drawer').classList.add('open'); $('#drawerBackdrop').classList.add('show');
     return;
   }
@@ -1485,6 +1533,12 @@ $('#bgInput').onchange = (e)=>{
   if(f) loadBgFromFile(f);
   e.target.value='';
 };
+$('#bgVidBtn').onclick = ()=> $('#bgVidInput').click();
+$('#bgVidInput').onchange = (e)=>{
+  const f = e.target.files && e.target.files[0];
+  if(f) loadBgVideoFromFile(f);
+  e.target.value='';
+};
 
 /* ---------- Video-stage controls ---------- */
 $('#vPlay').onclick = toggle;
@@ -1516,6 +1570,11 @@ if(_electron){
     APP_WEBUTILS = _electron.webUtils || null;
     const dir = _electron.ipcRenderer.sendSync('get-userdata');
     PLAYLIST_FILE = require('path').join(dir, 'playlist.json');
+    // restore a remembered background video (only if the file still exists)
+    try{
+      const vp = localStorage.getItem(LS_BGVID);
+      if(vp && APP_FS.existsSync(vp)){ bgVideoPath = vp; bgVideoUrl = pathToURL(vp); bgImage = null; }
+    }catch(e){}
   }catch(e){ APP_FS=null; }
 }
 function getFilePath(f){
