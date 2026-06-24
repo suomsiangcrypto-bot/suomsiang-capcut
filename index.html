@@ -666,6 +666,11 @@
           <div class="tab sm wave-label" id="skinLabel">สกิน 1/10</div>
           <div class="tab sm wbtn" id="skinNext" title="สกินถัดไป">▶</div>
         </div>
+        <div class="plist-tabs">
+          <div class="tab sm wbtn" id="ringPrev" title="วงแหวนก่อนหน้า">◀</div>
+          <div class="tab sm wave-label" id="ringLabel">วงแหวน 1/6</div>
+          <div class="tab sm wbtn" id="ringNext" title="วงแหวนถัดไป">▶</div>
+        </div>
         <div class="track-list" id="listA"></div>
       </div>
     </div>
@@ -756,7 +761,7 @@ let _loaded=null;
 function saveSettings(){
   try{
     localStorage.setItem(LS_KEY, JSON.stringify({
-      skin:skinIndex, volume, eq:eqValues, wave:waveStyle, loop:isLoop, muted:isMuted
+      skin:skinIndex, volume, eq:eqValues, wave:waveStyle, ring:ringStyle, loop:isLoop, muted:isMuted
     }));
   }catch(e){ /* storage unavailable — run without persistence */ }
 }
@@ -1210,6 +1215,9 @@ let wavePhase=0;
 let waveStyle=0;
 const WAVE_STYLES=10;
 const WAVE_NAMES=['ยอดแหลมเรืองแสง','สเปกตรัม','ออสซิลโลสโคป','คลื่นเติมสี','จุดกระจาย','วงกลม','เส้นคู่','LED บล็อก','เข็มแหลม','ริบบิ้น'];
+let ringStyle=0;
+const RING_STYLES=6;
+const RING_NAMES=['แท่งพุ่งออก','จุดเรืองแสง','แท่งสองทาง','คลื่นวงกลม','LED วงแหวน','ปิดวงแหวน'];
 
 function getAmps(N){
   const a=new Array(N);
@@ -1236,35 +1244,87 @@ let knobGlowCur=0;
 const knobGlowEl=document.getElementById('knobGlow');
 const bigRingEl=document.querySelector('.big-ring');
 const ringViz=document.getElementById('ringViz'), rvctx=ringViz?ringViz.getContext('2d'):null;
+function ringAmp(i,N,playing){
+  if(playing){
+    const idx=Math.floor(Math.pow(i/N,1.3)*freqArray.length*0.55)+2;
+    return Math.min(1, freqArray[idx]/255*1.3);
+  }
+  return 0.16+0.12*Math.abs(Math.sin(i*0.5+wavePhase*1.1));
+}
 function drawRingViz(){
   if(!ringViz||!rvctx) return;
-  // auto-size to the element
   const cw=ringViz.clientWidth, ch=ringViz.clientHeight;
   if(ringViz.width!==cw*2 || ringViz.height!==ch*2){ ringViz.width=cw*2; ringViz.height=ch*2; }
   const W=ringViz.width, H=ringViz.height;
   rvctx.clearRect(0,0,W,H);
-  if(!powered) return;
-  const cx=W/2, cy=H/2, base=W*0.387;   // just outside the metallic bezel (button is width-based)
-  const N=76, playing = isPlaying && analyser && freqArray;
+  if(!powered || ringStyle===5) return;        // 5 = off
+  const cx=W/2, cy=H/2, base=W*0.387;
+  const playing = isPlaying && analyser && freqArray;
   rvctx.lineCap='round';
-  for(let i=0;i<N;i++){
-    let amp;
-    if(playing){
-      const idx=Math.floor(Math.pow(i/N,1.3)*freqArray.length*0.55)+2;
-      amp=Math.min(1, freqArray[idx]/255*1.3);
-    } else {
-      amp=0.16+0.12*Math.abs(Math.sin(i*0.5+wavePhase*1.1));
+
+  if(ringStyle===0){            // radial bars (outward)
+    const N=76;
+    for(let i=0;i<N;i++){
+      const amp=ringAmp(i,N,playing), len=W*0.012+amp*W*0.09, ang=(i/N)*Math.PI*2-Math.PI/2;
+      const c=(i%6===0)?RING_B:RING_A;
+      rvctx.strokeStyle=c; rvctx.lineWidth=Math.max(2,W*0.011); rvctx.shadowColor=c; rvctx.shadowBlur=12;
+      rvctx.beginPath();
+      rvctx.moveTo(cx+Math.cos(ang)*base, cy+Math.sin(ang)*base);
+      rvctx.lineTo(cx+Math.cos(ang)*(base+len), cy+Math.sin(ang)*(base+len));
+      rvctx.stroke();
     }
-    const len=W*0.012 + amp*W*0.09;
-    const ang=(i/N)*Math.PI*2 - Math.PI/2;
-    const c=(i%6===0)?RING_B:RING_A;
-    const x1=cx+Math.cos(ang)*base, y1=cy+Math.sin(ang)*base;
-    const x2=cx+Math.cos(ang)*(base+len), y2=cy+Math.sin(ang)*(base+len);
-    rvctx.strokeStyle=c; rvctx.lineWidth=Math.max(2, W*0.011);
-    rvctx.shadowColor=c; rvctx.shadowBlur=12;
-    rvctx.beginPath(); rvctx.moveTo(x1,y1); rvctx.lineTo(x2,y2); rvctx.stroke();
+  }
+  else if(ringStyle===1){       // glowing dots that grow with the beat
+    const N=60;
+    for(let i=0;i<N;i++){
+      const amp=ringAmp(i,N,playing), ang=(i/N)*Math.PI*2-Math.PI/2;
+      const r=W*0.011+amp*W*0.022, c=(i%5===0)?RING_B:RING_A;
+      const x=cx+Math.cos(ang)*(base+W*0.03), y=cy+Math.sin(ang)*(base+W*0.03);
+      rvctx.fillStyle=c; rvctx.shadowColor=c; rvctx.shadowBlur=14;
+      rvctx.beginPath(); rvctx.arc(x,y,r,0,7); rvctx.fill();
+    }
+  }
+  else if(ringStyle===2){       // bars both ways (mirrored band)
+    const N=72;
+    for(let i=0;i<N;i++){
+      const amp=ringAmp(i,N,playing), len=W*0.01+amp*W*0.06, ang=(i/N)*Math.PI*2-Math.PI/2;
+      const c=(i%6===0)?RING_B:RING_A;
+      rvctx.strokeStyle=c; rvctx.lineWidth=Math.max(2,W*0.012); rvctx.shadowColor=c; rvctx.shadowBlur=11;
+      rvctx.beginPath();
+      rvctx.moveTo(cx+Math.cos(ang)*(base-len), cy+Math.sin(ang)*(base-len));
+      rvctx.lineTo(cx+Math.cos(ang)*(base+len), cy+Math.sin(ang)*(base+len));
+      rvctx.stroke();
+    }
+  }
+  else if(ringStyle===3){       // smooth wobbling circle (closed curve)
+    const N=96, pts=[];
+    for(let i=0;i<N;i++){ const amp=ringAmp(i,N,playing), ang=(i/N)*Math.PI*2-Math.PI/2, rr=base+W*0.01+amp*W*0.07;
+      pts.push([cx+Math.cos(ang)*rr, cy+Math.sin(ang)*rr]); }
+    rvctx.lineWidth=Math.max(2,W*0.009); rvctx.shadowColor=RING_A; rvctx.shadowBlur=14;
+    rvctx.strokeStyle=RING_A; rvctx.beginPath();
+    for(let i=0;i<=N;i++){ const a=pts[i%N], b=pts[(i+1)%N], xc=(a[0]+b[0])/2, yc=(a[1]+b[1])/2;
+      if(i===0) rvctx.moveTo(a[0],a[1]); else rvctx.quadraticCurveTo(a[0],a[1],xc,yc); }
+    rvctx.closePath(); rvctx.stroke();
+  }
+  else if(ringStyle===4){       // LED block segments around the ring
+    const N=48, gap=0.45;
+    for(let i=0;i<N;i++){
+      const amp=ringAmp(i,N,playing), segs=1+Math.round(amp*5), ang=(i/N)*Math.PI*2-Math.PI/2;
+      const c=(i%6===0)?RING_B:RING_A;
+      for(let s=0;s<segs;s++){
+        const rr=base+s*(W*0.018);
+        rvctx.strokeStyle=c; rvctx.lineWidth=Math.max(2,W*0.013); rvctx.shadowColor=c; rvctx.shadowBlur=9;
+        const a0=ang-(1-gap)*(Math.PI/N), a1=ang+(1-gap)*(Math.PI/N);
+        rvctx.beginPath(); rvctx.arc(cx,cy,rr,a0,a1); rvctx.stroke();
+      }
+    }
   }
   rvctx.shadowBlur=0;
+}
+function setRingStyle(n, noSave){
+  ringStyle=((n%RING_STYLES)+RING_STYLES)%RING_STYLES;
+  const lbl=$('#ringLabel'); if(lbl){ lbl.textContent='วงแหวน '+(ringStyle+1)+'/'+RING_STYLES; lbl.title=RING_NAMES[ringStyle]; }
+  if(!noSave) saveSettings();
 }
 const deviceEl=document.getElementById('device');
 function drawWave(){
@@ -1457,9 +1517,12 @@ window.addEventListener('load',()=>{
   window.addEventListener('touchend',()=> wseekDrag=false);
   $('#skinPrev')?.addEventListener('click',()=> setSkin(skinIndex-1));
   $('#skinNext')?.addEventListener('click',()=> setSkin(skinIndex+1));
+  $('#ringPrev')?.addEventListener('click',()=> setRingStyle(ringStyle-1));
+  $('#ringNext')?.addEventListener('click',()=> setRingStyle(ringStyle+1));
   // apply persisted look + state (skin paints body bg, honoring any custom image)
   setWaveStyle(_loaded ? (_loaded.wave||0) : 0, true);
   setSkin(_loaded && _loaded.skin!=null ? _loaded.skin : 0, true);
+  setRingStyle(_loaded && _loaded.ring!=null ? _loaded.ring : 0, true);
   // reflect saved mute / loop on their buttons
   $('#muteBtn').textContent = isMuted ? '🔇' : '🔊';
   $('#muteBtn').classList.toggle('active', !isMuted);
